@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DEFECTS>
+  <DEFECT>
+    <SFA>
+      <FILEPATH>e:\programming\vulkanraytracing\vulkanframework</FILEPATH>
+      <FILENAME>vulkanapp.cpp</FILENAME>
+      <LINE>15</LINE>
+      <COLUMN>11</COLUMN>
+    </SFA>
+    <DEFECTCODE>26495</DEFECTCODE>
+    <DESCRIPTION>Variable 'VulkanApp::m_ComputePipelineLayout' is uninitialized. Always initialize a member variable (type.6).</DESCRIPTION>
+    <FUNCTION>VulkanApp::{ctor}</FUNCTION>
+    <DECORATED>??0VulkanApp@@QEAA@PEAVVulkanDevice@vkw@@@Z</DECORATED>
+    <FUNCLINE>15</FUNCLINE>
+    <PATH></PATH>
+  </DEFECT>
+  <DEFECT>
+    <SFA>
+      <FILEPATH>e:\programming\vulkanraytracing\vulkanframework</FILEPATH>
+      <FILENAME>vulkanapp.h</FILENAME>
+      <LINE>72</LINE>
+      <COLUMN>1</COLUMN>
+    </SFA>
+    <DEFECTCODE>26495</DEFECTCODE>
+    <DESCRIPTION>Variable 'VulkanApp::UBOCompute::lightPos' is uninitialized. Always initialize a member variable (type.6).</DESCRIPTION>
+    <FUNCTION>VulkanApp::UBOCompute::{ctor}</FUNCTION>
+    <DECORATED>??0UBOCompute@VulkanApp@@QEAA@XZ</DECORATED>
+    <FUNCLINE>72</FUNCLINE>
+    <PATH></PATH>
+  </DEFECT>
+</DEFECTS>
