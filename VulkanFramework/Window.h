@@ -1,6 +1,7 @@
 #pragma once
 #include "Platform.h"
 #include <string>
+#include "glm/glm.hpp"
 
 namespace vkw 
 {
@@ -12,6 +13,9 @@ namespace vkw
 		Window(VulkanBaseApp* app, VulkanDevice* device, uint32_t width, uint32_t height);
 		~Window();
 		void Update();
+		bool IsKeyButtonDown(int key);
+		void LockMousePos(bool locked);
+		glm::vec2 GetMousePos();
 
 		VkSurfaceKHR GetSurface();
 		VkExtent2D GetSurfaceSize();
@@ -33,6 +37,7 @@ namespace vkw
 		VkSurfaceCapabilitiesKHR			m_SurfaceCapabilities{};
 		VkSurfaceFormatKHR					m_SurfaceFormat{};
 
+		bool								m_IsMouseLocked{};
 		//Platfrom specific members
 
 #if VK_USE_PLATFORM_WIN32_KHR
@@ -40,6 +45,8 @@ namespace vkw
 		HWND								m_Win32Window = NULL;
 		std::string							m_Win32ClassName{};
 		static uint64_t						m_Win32ClassIdCounter;
+		PBYTE								m_KeyboardMouseState;
+		POINT								m_MousePos;
 #endif
 
 	};

@@ -20,6 +20,7 @@ namespace vkw
 		const VkQueue GetQueue() const;
 		const  VkPhysicalDeviceProperties& GetPhysicalDeviceProperties() const;
 		const VkPhysicalDeviceMemoryProperties & GetPhysicalDeviceMemoryProperties() const;
+		const VkPhysicalDeviceFeatures& GetDeviceFeatures() const;
 
 	private:
 		void SetUpLayersAndExtensions();
@@ -39,9 +40,11 @@ namespace vkw
 		VkInstance m_pInstance = VK_NULL_HANDLE; // we use null handle instead of nullptr because null handle has the same size in x64 and x86
 		VkPhysicalDevice m_pGPU = VK_NULL_HANDLE;
 		VkPhysicalDeviceProperties m_GPUProperties{};
+		VkPhysicalDeviceFeatures m_Features{};
 		VkPhysicalDeviceMemoryProperties m_GPUMemoryProperties{};
 		VkDevice m_pDevice = VK_NULL_HANDLE;
 		VkQueue m_pQueue = VK_NULL_HANDLE;
+
 
 		uint32_t m_GraphicsQueueFamilyId = 0;
 		uint32_t m_ComputeQueueFamilyId = 0;

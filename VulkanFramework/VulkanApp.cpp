@@ -11,6 +11,9 @@
 #include "RenderPass.h"
 #include "CommandPool.h"
 #include "FrameBuffer.h"
+#include <sstream>
+#include <algorithm>
+#include <gli/gli.hpp>
 
 VulkanApp::VulkanApp(vkw::VulkanDevice* pDevice):VulkanBaseApp(pDevice, "Raytracing God :)")
 {
@@ -55,6 +58,10 @@ bool VulkanApp::Update(float dTime)
 {
 	m_AccuTime += dTime;
 	UpdateUniformBuffers();
+	if(GetWindow()->IsKeyButtonDown(VK_UP))
+	{
+		m_Depth += dTime * 10;
+	}
 	return VulkanBaseApp::Update(dTime);
 }
 
@@ -65,7 +72,8 @@ void VulkanApp::Init(float width, float height)
 	CreateStorageBuffers();
 	CreateUniformBuffers();
 	UpdateUniformBuffers();
-	CreateTextureTarget();
+	CreateSampleTextures();
+	CreateCubeMap();
 	CreateGraphicsPipeline();
 	CreateDescriptorPool();
 	CreateDescriptorSet();
@@ -82,18 +90,21 @@ void VulkanApp::Cleanup()
 	DestroyComputePipeline();
 	DestroyDescriptorPool();
 	DestroyGraphicsPipeline();
-	DestroyTextureTarget();
+	DestroyCubeMap();
+	DestroyTextureSamples();
 	DestroyUniformBuffers();
 	DestroyStorageBuffers();
 }
 
 void VulkanApp::CreateStorageBuffers()
 {
+	uint32_t currentId{0};
+
 	// Spheres
 	std::vector<Sphere> spheres;
-	spheres.push_back(Sphere{ glm::vec3(1.75f, -0.5f, 0.0f), 1.0f, glm::vec3(0.0f, 1.0f, 0.0f), 32.0f, 0 });
-	spheres.push_back(Sphere{ glm::vec3(0.0f, 1.0f, -0.5f), 1.0f, glm::vec3(0.65f, 0.77f, 0.97f), 32.0f, 1 });
-	spheres.push_back(Sphere{ glm::vec3(-1.75f, -0.75f, -0.5f), 1.25f, glm::vec3(0.9f, 0.76f, 0.46f), 32.0f, 2 });
+	spheres.push_back(Sphere{ glm::vec3(0.f, 0.0f, -2.0f), 0.5f, glm::vec3(0.0f, 1.0f, 0.0f), ++currentId });
+	spheres.push_back(Sphere{ glm::vec3(0.0f, 1.0f, -2.f), 0.5f, glm::vec3(0.65f, 0.77f, 0.97f),  ++currentId });
+	spheres.push_back(Sphere{ glm::vec3(-1.75f, 0.75f, -2.f), 0.5f, glm::vec3(0.9f, 0.76f, 0.46f), ++currentId });
 	VkDeviceSize storageBufferSize = spheres.size() * sizeof(Sphere);
 
 	m_pSphereGeomBuffer = new vkw::Buffer(
@@ -104,13 +115,8 @@ void VulkanApp::CreateStorageBuffers()
 
 	// Planes
 	std::vector<Plane> planes;
-	const float roomDim = 4.0f;
-	planes.push_back(Plane{ glm::vec3(0.0f, 1.0f, 0.0f), roomDim, glm::vec3(1.0f), 32.0f, 3 });
-	//planes.push_back(Plane{ glm::vec3(0.0f, -1.0f, 0.0f), roomDim, glm::vec3(1.0f), 32.0f, 4 });
-	//planes.push_back(Plane{ glm::vec3(0.0f, 0.0f, 1.0f), roomDim, glm::vec3(1.0f), 32.0f, 5 });
-	//planes.push_back(Plane{ glm::vec3(0.0f, 0.0f, -1.0f), roomDim, glm::vec3(0.0f), 32.0f, 6 });
-	//planes.push_back(Plane{ glm::vec3(-1.0f, 0.0f, 0.0f), roomDim, glm::vec3(1.0f, 0.0f, 0.0f), 32.0f, 7 });
-	//planes.push_back(Plane{ glm::vec3(1.0f, 0.0f, 0.0f), roomDim, glm::vec3(0.0f, 1.0f, 0.0f), 32.0f, 8 });
+	const float roomDim = 20000.f;
+	planes.push_back(Plane{ glm::vec3(0.0f, 1.0f, 0.0f), roomDim, glm::vec3(1.0f, 0.f, 0.f), ++currentId });
 	storageBufferSize = planes.size() * sizeof(Plane);
 
 	m_pPlaneGeomBuffer = new vkw::Buffer(
@@ -120,7 +126,7 @@ void VulkanApp::CreateStorageBuffers()
 	);
 
 	std::vector<Triangle> triangles;
-	triangles.push_back(Triangle{ {-1.f, -1.f, 0.f}, 4, {0.f, 1.f, 0.f}, 32.f, {1.f, -1.f, 0.f}, 0, {0.f, 0.f, 1.f}, 0, {0.65f, 0.77f, 0.97f} });
+	triangles = LoadModel("Models/Cube.obj", currentId);
 
 	m_pTriangleGeomBuffer = new vkw::Buffer(
 		GetDevice(), GetCommandPool(),
@@ -140,17 +146,30 @@ void VulkanApp::CreateUniformBuffers()
 
 void VulkanApp::UpdateUniformBuffers()
 {
-	m_UniformBufferData.lightPos.x = 0.0f + sin(glm::radians(m_AccuTime * 20.0f)) * cos(glm::radians(1 * 360.0f)) * 2.0f;
-	m_UniformBufferData.lightPos.y = 0.0f + sin(glm::radians(m_AccuTime * 20.0f)) * 2.0f;
-	m_UniformBufferData.lightPos.z = 0.0f + cos(glm::radians(m_AccuTime * 20.0f)) * 2.0f;
-	m_UniformBufferData.lookat = { 0.0f, 0.5f, 0.0f };
-	m_UniformBufferData.pos = { 0.0f, 0.0f, 4.0f };
-	m_pUniformBuffer->Update(&m_UniformBufferData ,sizeof(UBOCompute), GetCommandPool());
+	++m_UniformBufferData.currentLayer;
+	m_UniformBufferData.currentLayer %= m_SampleCount;
+
+	m_UniformBufferData.lightPos.x = 0.0f + 20*cos(glm::radians(m_AccuTime * 20.0f));
+	m_UniformBufferData.lightPos.y = 3.f;
+	m_UniformBufferData.lightPos.z = 0.0f + 20 * sin(glm::radians(m_AccuTime * 20.0f));
+	//m_UniformBufferData.lightPos = { 0.0f, 10.0f, 15.0f };
+	
+	m_UniformBufferData.rayOffset.x = (2*rand() % 1000) / 1000.f - 1.f;
+	m_UniformBufferData.rayOffset.y = (2*rand() % 1000) / 1000.f - 1.f;
+	//m_UniformBufferData.rayOffset.x = 0.5f;
+	// m_UniformBufferData.rayOffset.y = 0.5f;
+
+	m_UniformBufferData.lookat = { 0.5f, 0.5f, 0.f };
+	m_UniformBufferData.pos = { 0.f, 0.0f, m_Depth };
+	m_UniformBufferData.aspectRatio =  float(GetWindow()->GetSurfaceSize().width) / float(GetWindow()->GetSurfaceSize().height);
+	//m_UniformBufferData.fogColor = { 0.9f , 0.9f, 0.9f, 0.2f};
+	m_pUniformBuffer->Update(&m_UniformBufferData , sizeof(UBOCompute), GetCommandPool());
 }
 
-void VulkanApp::CreateTextureTarget()
+
+void VulkanApp::CreateSampleTextures()
 {
-	m_pTexture = new vkw::Texture(GetDevice(), GetCommandPool(), VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_GENERAL, nullptr, GetWindow()->GetSurfaceSize().width, GetWindow()->GetSurfaceSize().height);
+	m_pSampleTextures = new vkw::Texture(GetDevice(), GetCommandPool(), VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_GENERAL, nullptr, GetWindow()->GetSurfaceSize().width, GetWindow()->GetSurfaceSize().height, m_SampleCount);
 }
 
 void VulkanApp::CreateGraphicsPipeline()
@@ -175,6 +194,9 @@ void VulkanApp::CreateGraphicsPipeline()
 	
 	ErrorCheck(vkCreateDescriptorSetLayout(GetDevice()->GetDevice(), &descriptorSetLayoutCreateInfo, nullptr, &m_GraphicsDescriptorSetLayout));
 
+
+	
+
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = 1;
@@ -183,8 +205,8 @@ void VulkanApp::CreateGraphicsPipeline()
 	
 	ErrorCheck(vkCreatePipelineLayout(GetDevice()->GetDevice(), &pipelineLayoutCreateInfo, nullptr, &m_GraphicsPipelineLayout));
 
-	std::vector<char> vertShaderCode = readFile("Shaders/vert.spv");
-	std::vector<char> fragShaderCode = readFile("Shaders/frag.spv");
+	std::vector<char> vertShaderCode = readFile("Shaders/texture.vert.spv");
+	std::vector<char> fragShaderCode = readFile("Shaders/texture.frag.spv");
 
 	VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode, GetDevice()->GetDevice());
 	VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode, GetDevice()->GetDevice());
@@ -316,13 +338,13 @@ void VulkanApp::CreateDescriptorPool()
 {
 	std::array<VkDescriptorPoolSize, 4> poolSizes{};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<uint32_t>(GetSwapchain()->GetImageCount());
+	poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(GetSwapchain()->GetImageCount());
+	poolSizes[1].descriptorCount = 3;
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[2].descriptorCount = 1;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[3].descriptorCount = static_cast<uint32_t>(GetSwapchain()->GetImageCount());
+	poolSizes[3].descriptorCount = 1;
 
 	VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 	descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -342,25 +364,26 @@ void VulkanApp::CreateDescriptorSet()
 	allocInfo.descriptorSetCount = 1;
 
 	ErrorCheck(vkAllocateDescriptorSets(GetDevice()->GetDevice(), &allocInfo, &m_GraphicsDescriptorSet));
-
-	VkWriteDescriptorSet writeDescriptorSet{};
-	writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptorSet.dstSet = m_GraphicsDescriptorSet;
-	writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writeDescriptorSet.dstBinding = 0;
-	writeDescriptorSet.pImageInfo = &m_pTexture->GetDescriptor();
-	writeDescriptorSet.descriptorCount = 1;
 	
+	VkWriteDescriptorSet texArrayDescriptorSet{};
+	texArrayDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	texArrayDescriptorSet.dstSet = m_GraphicsDescriptorSet;
+	texArrayDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	texArrayDescriptorSet.dstBinding = 0;
+	texArrayDescriptorSet.pImageInfo = &m_pSampleTextures->GetDescriptor();
+	texArrayDescriptorSet.descriptorCount = 1;
 
-	vkUpdateDescriptorSets(GetDevice()->GetDevice(), 1, &writeDescriptorSet, 0, NULL);
+	std::vector<VkWriteDescriptorSet> writeDescriptors
+	(
+		{ texArrayDescriptorSet }
+	);
+
+	vkUpdateDescriptorSets(GetDevice()->GetDevice(), writeDescriptors.size(), writeDescriptors.data(), 0, NULL);
 }
 
 void VulkanApp::CreateComputePipeline()
 {
-	// Create a compute capable device queue
-		// The VulkanDevice::createLogicalDevice functions finds a compute capable queue and prefers queue families that only support compute
-		// Depending on the implementation this may result in different queue family indices for graphics and computes,
-		// requiring proper synchronization (see the memory barriers in buildComputeCommandBuffer)
+	//Create compute queue
 	VkDeviceQueueCreateInfo queueCreateInfo = {};
 	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	queueCreateInfo.pNext = NULL;
@@ -368,7 +391,7 @@ void VulkanApp::CreateComputePipeline()
 	queueCreateInfo.queueCount = 1;
 	vkGetDeviceQueue(GetDevice()->GetDevice(), GetDevice()->GetComputeFamilyQueueId(), 0, &m_ComputeQueue);
 
-	std::array<VkDescriptorSetLayoutBinding, 5> setLayoutBindings{};
+	std::array<VkDescriptorSetLayoutBinding, 6> setLayoutBindings{};
 	setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	setLayoutBindings[0].binding = 0;
@@ -393,6 +416,13 @@ void VulkanApp::CreateComputePipeline()
 	setLayoutBindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	setLayoutBindings[4].binding = 4;
 	setLayoutBindings[4].descriptorCount = 1;
+
+	setLayoutBindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	setLayoutBindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	setLayoutBindings[5].binding = 5;
+	setLayoutBindings[5].descriptorCount = 1;
+
+
 
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
 	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -419,13 +449,13 @@ void VulkanApp::CreateComputePipeline()
 	
 	ErrorCheck(vkAllocateDescriptorSets(GetDevice()->GetDevice(), &allocInfo, &m_ComputeDescriptorSet));
 
-	std::array<VkWriteDescriptorSet, 5> computeWriteDescriptorSets{};
+	std::array<VkWriteDescriptorSet, 6> computeWriteDescriptorSets{};
 	computeWriteDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	computeWriteDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	computeWriteDescriptorSets[0].descriptorCount = 1;
 	computeWriteDescriptorSets[0].dstSet = m_ComputeDescriptorSet;
 	computeWriteDescriptorSets[0].dstBinding = 0;
-	computeWriteDescriptorSets[0].pImageInfo = &m_pTexture->GetDescriptor();
+	computeWriteDescriptorSets[0].pImageInfo = &m_pSampleTextures->GetDescriptor();
 
 	computeWriteDescriptorSets[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	computeWriteDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -455,10 +485,17 @@ void VulkanApp::CreateComputePipeline()
 	computeWriteDescriptorSets[4].dstSet = m_ComputeDescriptorSet;
 	computeWriteDescriptorSets[4].pBufferInfo = &m_pTriangleGeomBuffer->GetDescriptor();
 
+	computeWriteDescriptorSets[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	computeWriteDescriptorSets[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	computeWriteDescriptorSets[5].descriptorCount = 1;
+	computeWriteDescriptorSets[5].dstBinding = 5;
+	computeWriteDescriptorSets[5].dstSet = m_ComputeDescriptorSet;
+	computeWriteDescriptorSets[5].pImageInfo = &m_CubeMap.descriptor;
+
 
 	vkUpdateDescriptorSets(GetDevice()->GetDevice(), computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, NULL);
 
-	VkShaderModule computeShaderModule = CreateShaderModule(readFile("Shaders/comp.spv"), GetDevice()->GetDevice());
+	VkShaderModule computeShaderModule = CreateShaderModule(readFile("Shaders/raytracing.comp.spv"), GetDevice()->GetDevice());
 
 	VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
 	computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -512,9 +549,138 @@ void VulkanApp::BuildComputeCommandBuffers()
 	vkCmdBindPipeline(m_ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipeline);
 	vkCmdBindDescriptorSets(m_ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ComputePipelineLayout, 0, 1, &m_ComputeDescriptorSet, 0, 0);
 
-	vkCmdDispatch(m_ComputeCommandBuffer, m_pTexture->GetWidth() / 16, m_pTexture->GetHeight() / 16, 1);
+	vkCmdDispatch(m_ComputeCommandBuffer, m_pSampleTextures->GetWidth() / 16, m_pSampleTextures->GetHeight() / 16, 1);
 
 	vkEndCommandBuffer(m_ComputeCommandBuffer);
+}
+
+void VulkanApp::CreateCubeMap()
+{
+	//Pick image with supported format
+	std::string filename;
+	VkFormat format;
+	if (GetDevice()->GetDeviceFeatures().textureCompressionBC) {
+		filename = "cubemap_yokohama_bc3_unorm.ktx";
+		format = VK_FORMAT_BC2_UNORM_BLOCK;
+	}
+	else if (GetDevice()->GetDeviceFeatures().textureCompressionASTC_LDR) {
+		filename = "cubemap_yokohama_astc_8x8_unorm.ktx";
+		format = VK_FORMAT_ASTC_8x8_UNORM_BLOCK;
+	}
+	else if (GetDevice()->GetDeviceFeatures().textureCompressionETC2) {
+		filename = "cubemap_yokohama_etc2_unorm.ktx";
+		format = VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
+	}
+	else {
+		assert("Device does not support required format!" && 0);
+		std::exit(-1);
+	}
+
+	//TODO: move this into its own class
+	gli::texture_cube texCube(gli::load("Textures/" + filename));
+
+	assert(!texCube.empty());
+
+	m_CubeMap.width = texCube.extent().x;
+	m_CubeMap.height = texCube.extent().y;
+	m_CubeMap.mipLevels = texCube.levels();
+
+
+	CreateImage(GetDevice()->GetDevice(), GetDevice()->GetPhysicalDeviceMemoryProperties(),
+		m_CubeMap.width, m_CubeMap.height,
+		format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_CubeMap.image, m_CubeMap.memory, 6, m_CubeMap.mipLevels, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
+	);
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory; 
+
+
+	CreateBuffer(GetDevice()->GetDevice(), GetDevice()->GetPhysicalDeviceMemoryProperties(), texCube.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	uint8_t *data;
+	ErrorCheck(vkMapMemory(GetDevice()->GetDevice(), stagingBufferMemory, 0, texCube.size(), 0, (void **)&data));
+	memcpy(data, texCube.data(), texCube.size());
+	vkUnmapMemory(GetDevice()->GetDevice(), stagingBufferMemory);
+
+	
+	std::vector<VkBufferImageCopy> bufferCopyRegions;
+	uint32_t offset = 0;
+
+	for (uint32_t face = 0; face < 6; face++)
+	{
+		for (uint32_t level = 0; level < m_CubeMap.mipLevels; level++)
+		{
+			VkBufferImageCopy bufferCopyRegion = {};
+			bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			bufferCopyRegion.imageSubresource.mipLevel = level;
+			bufferCopyRegion.imageSubresource.baseArrayLayer = face;
+			bufferCopyRegion.imageSubresource.layerCount = 1;
+			bufferCopyRegion.imageExtent.width = texCube[face][level].extent().x;
+			bufferCopyRegion.imageExtent.height = texCube[face][level].extent().y;
+			bufferCopyRegion.imageExtent.depth = 1;
+			bufferCopyRegion.bufferOffset = offset;
+
+			bufferCopyRegions.push_back(bufferCopyRegion);
+
+			offset += texCube[face][level].size();
+		}
+	}
+
+
+	VkImageSubresourceRange subresourceRange = {};
+	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresourceRange.baseMipLevel = 0;
+	subresourceRange.levelCount = m_CubeMap.mipLevels;
+	subresourceRange.layerCount = 6;
+
+	TransitionImageLayout(GetDevice()->GetDevice(), GetDevice()->GetQueue(), GetCommandPool()->GetHandle(), m_CubeMap.image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, m_CubeMap.mipLevels);
+
+	VkCommandBuffer commandBuffer = BeginSingleTimeCommands(GetDevice()->GetDevice(), GetCommandPool()->GetHandle());
+
+	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, m_CubeMap.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, bufferCopyRegions.size(), bufferCopyRegions.data());
+
+	EndSingleTimeCommands(GetDevice()->GetDevice(), GetDevice()->GetQueue(), GetCommandPool()->GetHandle(), commandBuffer);
+
+	m_CubeMap.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	TransitionImageLayout(GetDevice()->GetDevice(), GetDevice()->GetQueue(), GetCommandPool()->GetHandle(), m_CubeMap.image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_CubeMap.imageLayout, 6, m_CubeMap.mipLevels);
+
+	VkSamplerCreateInfo sampler{};
+	sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler.magFilter = VK_FILTER_LINEAR;
+	sampler.minFilter = VK_FILTER_LINEAR;
+	sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler.addressModeV = sampler.addressModeU;
+	sampler.addressModeW = sampler.addressModeU;
+	sampler.mipLodBias = 0.0f;
+	sampler.compareOp = VK_COMPARE_OP_NEVER;
+	sampler.minLod = 0.0f;
+	sampler.maxLod = m_CubeMap.mipLevels;
+	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	sampler.maxAnisotropy = 1.0f;
+	
+	ErrorCheck(vkCreateSampler(GetDevice()->GetDevice(), &sampler, nullptr, &m_CubeMap.sampler));
+
+	VkImageViewCreateInfo view{};
+	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+	view.format = format;
+	view.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+	view.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	view.subresourceRange.layerCount = 6;
+	view.subresourceRange.levelCount = m_CubeMap.mipLevels;
+	view.image = m_CubeMap.image;
+	ErrorCheck(vkCreateImageView(GetDevice()->GetDevice(), &view, nullptr, &m_CubeMap.imageView));
+
+	vkFreeMemory(GetDevice()->GetDevice(), stagingBufferMemory, nullptr);
+	vkDestroyBuffer(GetDevice()->GetDevice(), stagingBuffer, nullptr);
+	
+	m_CubeMap.descriptor.sampler = m_CubeMap.sampler;
+	m_CubeMap.descriptor.imageLayout = m_CubeMap.imageLayout;
+	m_CubeMap.descriptor.imageView = m_CubeMap.imageView;
 }
 
 void VulkanApp::DestroyStorageBuffers()
@@ -529,9 +695,17 @@ void VulkanApp::DestroyUniformBuffers()
 	delete m_pUniformBuffer;
 }
 
-void VulkanApp::DestroyTextureTarget()
+void VulkanApp::DestroyCubeMap()
 {
-	delete m_pTexture;
+	vkDestroySampler(GetDevice()->GetDevice(), m_CubeMap.sampler, nullptr);
+	vkDestroyImageView(GetDevice()->GetDevice(), m_CubeMap.imageView, nullptr);
+	vkDestroyImage(GetDevice()->GetDevice(), m_CubeMap.image, nullptr);
+	vkFreeMemory(GetDevice()->GetDevice(), m_CubeMap.memory, nullptr);
+}
+
+void VulkanApp::DestroyTextureSamples()
+{
+	delete m_pSampleTextures;
 }
 
 void VulkanApp::DestroyGraphicsPipeline()
@@ -553,6 +727,53 @@ void VulkanApp::DestroyComputePipeline()
 	vkDestroyDescriptorSetLayout(GetDevice()->GetDevice(), m_ComputeDescriptorSetLayout, nullptr);
 	vkDestroyFence(GetDevice()->GetDevice(), m_ComputeFence, nullptr);
 	vkDestroyCommandPool(GetDevice()->GetDevice(), m_ComputeCommandPool, nullptr);
+}
+
+std::vector<VulkanApp::Triangle> VulkanApp::LoadModel(std::string filePath, uint32_t& currentId)
+{
+	std::vector<glm::vec3> vertices;
+	std::vector<Triangle> tris;
+	std::ifstream input{ filePath };
+	if (input)
+	{
+		std::string line;
+		while (std::getline(input, line, '\n'))
+		{
+			if (line[0] == 'v')
+			{
+				std::string junk;
+				float x{};
+				float y{};
+				float z{};
+				std::istringstream sLine{ line };
+				sLine >> junk >> x >> y >> z;
+				vertices.push_back({ x, y, z });
+			}
+			else
+			{
+				if (line[0] == 'f')
+				{
+					size_t idx1;
+					size_t idx2;
+					size_t idx3;
+					std::istringstream sLine{ line };
+					std::string junk;
+					sLine >> junk >> idx1 >> idx2 >> idx3;
+					glm::vec3 v1 = vertices[idx1 - 1];
+					glm::vec3 v2 = vertices[idx2 - 1];
+					glm::vec3 v3 = vertices[idx3 - 1];
+					glm::vec3 n = glm::cross(v2 - v1, v3 - v1);
+					tris.push_back({ v1, ++currentId, v2, 32.f, v3, 0, n, 0, { 0.65f, 0.77f, 0.97f } });
+				}
+			}
+
+		}
+		return tris;
+	}else
+	{
+		assert("File not found" && 0);
+		std::exit(-1);
+	}
 }
 
 
@@ -588,7 +809,7 @@ void VulkanApp::BuildDrawCommandBuffers()
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-		imageMemoryBarrier.image = m_pTexture->GetImage();
+		imageMemoryBarrier.image = m_pSampleTextures->GetImage();
 		imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;

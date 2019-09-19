@@ -96,13 +96,17 @@ void Window::Init()
 	surfaceCreateInfo.hinstance = m_Win32Instance;
 	surfaceCreateInfo.hwnd = m_Win32Window;
 	vkCreateWin32SurfaceKHR(m_pDevice->GetInstance(), &surfaceCreateInfo, nullptr, &m_Surface);
+
+	m_KeyboardMouseState = new BYTE[256];
 }
 
 
 void Window::Destroy()
 {
+	delete m_KeyboardMouseState;
 	DestroyWindow(m_Win32Window);
 	UnregisterClass(m_Win32ClassName.c_str(), m_Win32Instance);
+	
 }
 
 void Window::Update()
@@ -112,6 +116,43 @@ void Window::Update()
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+
+	
+	GetKeyboardState(m_KeyboardMouseState);
+	if(GetCursorPos(&m_MousePos))
+	{
+		ScreenToClient(m_Win32Window, &m_MousePos);
+	}
+
+
+	if(m_IsMouseLocked)
+	{
+		POINT mouseCenter;
+		m_MousePos.x = m_SurfaceSize.width /2;
+		m_MousePos.y = m_SurfaceSize.height / 2;
+		mouseCenter.x = m_MousePos.x;
+		mouseCenter.y = m_MousePos.y;
+		ClientToScreen(m_Win32Window, &mouseCenter);
+
+		SetCursorPos(mouseCenter.x, mouseCenter.y);
+	}
+}
+
+bool vkw::Window::IsKeyButtonDown(int key)
+{
+	if(m_KeyboardMouseState)
+		return m_KeyboardMouseState[key] & 0xF0;
+	return false;
+}
+
+void vkw::Window::LockMousePos(bool locked)
+{
+	m_IsMouseLocked = false;
+}
+
+glm::vec2 vkw::Window::GetMousePos()
+{
+	return glm::vec2(float(m_MousePos.x), float(m_MousePos.y));
 }
 
 #endif

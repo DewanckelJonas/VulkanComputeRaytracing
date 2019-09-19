@@ -68,6 +68,11 @@ const VkPhysicalDeviceMemoryProperties & VulkanDevice::GetPhysicalDeviceMemoryPr
 	return m_GPUMemoryProperties;
 }
 
+const VkPhysicalDeviceFeatures & vkw::VulkanDevice::GetDeviceFeatures() const
+{
+	return m_Features;
+}
+
 
 
 void VulkanDevice::SetUpLayersAndExtensions()
@@ -221,6 +226,7 @@ void VulkanDevice::GetGPU()
 	vkEnumeratePhysicalDevices(m_pInstance, &GPUCount, GPUVec.data());
 	m_pGPU = GPUVec[0];
 	vkGetPhysicalDeviceProperties(m_pGPU, &m_GPUProperties);
+	vkGetPhysicalDeviceFeatures(m_pGPU, &m_Features);
 	vkGetPhysicalDeviceMemoryProperties(m_pGPU, &m_GPUMemoryProperties);
 }
 

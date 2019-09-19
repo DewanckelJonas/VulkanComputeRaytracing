@@ -9,7 +9,7 @@ int main()
 {
 	vkw::VulkanDevice device{};
 	VulkanApp app(&device);
-	app.Init(1000, 1080);
+	app.Init(1280, 720);
 	std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 	int frames{};
 	bool isRunning{ true };

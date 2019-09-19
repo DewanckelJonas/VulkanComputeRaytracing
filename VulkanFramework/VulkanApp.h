@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanBaseApp.h"
-#include "glm/glm.hpp"
+#include <glm/glm.hpp>
+#include <array>
 namespace vkw {
 	class Buffer;
 	class Texture;
@@ -16,10 +17,12 @@ public:
 	void Cleanup() override;
 
 private:
+	
 	void CreateStorageBuffers();
 	void CreateUniformBuffers();
 	void UpdateUniformBuffers();
-	void CreateTextureTarget();
+	void CreateSampleTextures();
+	void CreateCubeMap();
 	void CreateGraphicsPipeline();
 	void CreateDescriptorPool();
 	void CreateDescriptorSet();
@@ -30,41 +33,42 @@ private:
 
 	void DestroyStorageBuffers();
 	void DestroyUniformBuffers();
-	void DestroyTextureTarget();
+	void DestroyCubeMap();
+	void DestroyTextureSamples();
 	void DestroyGraphicsPipeline();
 	void DestroyDescriptorPool();
 	void DestroyComputePipeline();
 
-	vkw::Buffer*			m_pSphereGeomBuffer = nullptr;
-	vkw::Buffer*			m_pPlaneGeomBuffer = nullptr;
-	vkw::Buffer*			m_pTriangleGeomBuffer = nullptr;
+	vkw::Buffer*								m_pSphereGeomBuffer = nullptr;
+	vkw::Buffer*								m_pPlaneGeomBuffer = nullptr;
+	vkw::Buffer*								m_pTriangleGeomBuffer = nullptr;
 
-	vkw::Buffer*			m_pUniformBuffer = nullptr;
+	vkw::Buffer*								m_pUniformBuffer = nullptr;
 
-	vkw::Texture*			m_pTexture = nullptr;
+	static const uint32_t						m_SampleCount{ 20 };
+	uint32_t									m_MostRecentSample{ 0 };
+	uint32_t									m_CurrentNrOfSamples{ 0 };
+	vkw::Texture*								m_pSampleTextures = nullptr;
+
 
 	struct Sphere {									
 		glm::vec3 pos;
 		float radius;
 		glm::vec3 diffuse;
-		float specular;
 		uint32_t id;								
-		glm::ivec3 _pad;
 	};
 
 	struct Plane {
 		glm::vec3 normal;
 		float distance;
 		glm::vec3 diffuse;
-		float specular;
 		uint32_t id;
-		glm::ivec3 _pad;
 	};
 
 	struct Triangle
 	{
 		glm::vec3 p1;
-		int id;
+		uint32_t id;
 		glm::vec3 p2;
 		float specular;
 		glm::vec3 p3;
@@ -77,15 +81,31 @@ private:
 
 	struct UBOCompute {
 		glm::vec3 lightPos;
-		float aspectRatio = 800.f/600.f;						
-		glm::vec4 fogColor{0.f, 0.f, 0.f, 0.f};
-	
+		float aspectRatio;
+		glm::vec2 rayOffset{0.f, 0.f};
+		glm::vec2 pad{};
 		glm::vec3 pos = { 0.0f, 0.0f, 4.0f };
+		int currentLayer = 0;
 		glm::vec3 lookat {0.0f, 0.5f, 0.0f};
 		float fov = 10.0f;
 
 	} m_UniformBufferData;
 
+	struct CubeMap
+	{
+		VkImage image;
+		VkImageView imageView;
+		VkImageLayout imageLayout;
+		VkDeviceMemory memory;
+		float width;
+		float height;
+		uint32_t mipLevels;
+		VkSampler sampler;
+		VkDescriptorImageInfo descriptor;
+	} m_CubeMap;
+
+
+	std::vector<Triangle> LoadModel(std::string filePath, uint32_t& currentId);
 
 	VkPipeline				m_GraphicsPipeline = VK_NULL_HANDLE;
 	VkPipelineLayout		m_GraphicsPipelineLayout = VK_NULL_HANDLE;
@@ -104,5 +124,6 @@ private:
 	VkDescriptorSetLayout	m_ComputeDescriptorSetLayout = VK_NULL_HANDLE;
 
 	float					m_AccuTime{};
+	float					m_Depth{ 0.f };
 };
 
