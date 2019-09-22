@@ -11,14 +11,16 @@ layout (binding = 0, rgba8) uniform writeonly image2DArray resultImage;
 
 layout (binding = 1) uniform UBO 
 {
-	vec3 lightPos;
+	vec3 lightDir;
 	float aspectRatio;
 	vec2 rayOffset;
-	vec2 pad;
-	vec3 pos;
 	int currentLayer;
-	vec3 lookat;
 	float fov;
+	vec4 pos;
+	vec4 forward;
+	vec4 right;
+	vec4 up;
+	
 } ubo;
 
 struct Sphere 
@@ -221,22 +223,32 @@ vec3 Shade(inout Ray ray, HitInfo hit)
 {
 	if(hit.t < MAXLEN)
 	{
-		vec3 specular = vec3(0.6f, 0.6f, 0.6f);
+		vec3 specular = vec3(0.04f, 0.04f, 0.04f);
 
 		ray.origin = hit.position + hit.normal * 0.001f;
 		ray.dir = reflect(ray.dir, hit.normal);
 		ray.color *= specular;
 
-		return vec3(0.f, 0.f, 0.f);
+		
+		Ray shadowRay = Ray(hit.position + hit.normal * 0.001f, -1 * ubo.lightDir, vec3(1.f, 1.f, 1.f));
+		HitInfo shadowHit = intersect(shadowRay, MAXLEN);
+		if (shadowHit.t != MAXLEN)
+		{
+    		return vec3(0.0f, 0.0f, 0.0f);
+		}
+		
+
+		vec3 albedo = vec3(0.8f, 0.8f, 0.8f);
+		return clamp(dot(hit.normal, ubo.lightDir) *-1, 0.0f, 1.f) * 1.f * albedo;
 	}
 	else
 	{
 		ray.color = vec3(0.f, 0.f, 0.f);
 		//ivec3 dim = imageSize(resultImage);
 		//vec2 uv = vec2(gl_GlobalInvocationID.xy+ubo.rayOffset) / dim.xy;
-		//vec3 color = vec3(0.4f, 0.5f, 0.9f);
-		//return mix(color, vec3(1.f, 1.f, 1.f), 1-uv.y);
-		return texture(samplerCubeMap, vec3(ray.dir.x, -ray.dir.y, ray.dir.z)).xyz;
+		vec3 color = vec3(0.4f, 0.5f, 0.9f);
+		return mix(color, vec3(1.f, 1.f, 1.f), 1-ray.dir.y);
+		//return texture(samplerCubeMap, vec3(ray.dir.x, -ray.dir.y, ray.dir.z)).xyz;
 	}
 }
 
@@ -244,9 +256,13 @@ void main()
 {
 	ivec3 dim = imageSize(resultImage);
 	vec2 uv = vec2(gl_GlobalInvocationID.xy+ubo.rayOffset) / dim.xy;
+	uv = -1.0 + 2.0 * uv;
 	Ray ray;
-	ray.origin = ubo.pos;
-	ray.dir = normalize(vec3((-1.0 + 2.0 * uv) * vec2(ubo.aspectRatio, 1.0), -1.0));
+	ray.origin = ubo.pos.xyz;
+	ray.dir = normalize(uv.x*ubo.right.xyz*ubo.aspectRatio + uv.y*ubo.up.xyz + 1*ubo.forward.xyz);
+	//ray.dir = normalize(vec3((-1.0 + 2.0 * uv) * vec2(ubo.aspectRatio, 1.0), -1.0));
+	//ray.dir += ubo.lookat;
+	ray.dir = normalize(ray.dir);
 	ray.color = vec3(1.f, 1.f, 1.f);
 
 	vec3 finalColor = vec3(0.f, 0.f, 0.f);
@@ -256,9 +272,6 @@ void main()
 	{
 		HitInfo hit = intersect(ray, MAXLEN);
 		finalColor += ray.color * Shade(ray, hit);
-
-		if(!any(greaterThan(ray.color, vec3(0.f, 0.f, 0.f))))
-			break;
 	}
 
 	imageStore(resultImage, ivec3(gl_GlobalInvocationID.xy, ubo.currentLayer), vec4(finalColor, 0.0));

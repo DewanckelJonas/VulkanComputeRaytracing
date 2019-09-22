@@ -1,0 +1,30 @@
+﻿  Main.cpp
+  VulkanApp.cpp
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(241): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(293): warning C4244: '=': conversion from 'uint32_t' to 'float', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(294): warning C4244: '=': conversion from 'uint32_t' to 'float', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(356): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(366): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(400): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(430): warning C4267: 'argument': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(479): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(545): warning C4267: 'argument': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(644): warning C4244: '=': conversion from 'T' to 'float', possible loss of data
+          with
+          [
+              T=glm::i32
+          ]
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(645): warning C4244: '=': conversion from 'T' to 'float', possible loss of data
+          with
+          [
+              T=glm::i32
+          ]
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(646): warning C4267: '=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(650): warning C4244: 'argument': conversion from 'float' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(687): warning C4267: '+=': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(702): warning C4267: 'argument': conversion from 'size_t' to 'uint32_t', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(721): warning C4244: '=': conversion from 'uint32_t' to 'float', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(891): warning C4244: '=': conversion from 'uint32_t' to 'float', possible loss of data
+e:\programming\vulkanraytracing2\vulkanframework\vulkanapp.cpp(892): warning C4244: '=': conversion from 'uint32_t' to 'float', possible loss of data
+  Generating Code...
+  VulkanFramework.vcxproj -> E:\Programming\VulkanRaytracing2\x64\Debug\VulkanFramework.exe

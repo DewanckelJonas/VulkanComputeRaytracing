@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <gli/gli.hpp>
 
-VulkanApp::VulkanApp(vkw::VulkanDevice* pDevice):VulkanBaseApp(pDevice, "Raytracing God :)")
+VulkanApp::VulkanApp(vkw::VulkanDevice* pDevice):VulkanBaseApp(pDevice, "Raytracing")
 {
 }
 
@@ -57,11 +57,56 @@ void VulkanApp::Render()
 bool VulkanApp::Update(float dTime)
 {
 	m_AccuTime += dTime;
-	UpdateUniformBuffers();
-	if(GetWindow()->IsKeyButtonDown(VK_UP))
+	//UpdateSpheres();
+	if(GetWindow()->IsKeyButtonDown('W'))
 	{
-		m_Depth += dTime * 10;
+		m_UniformBufferData.pos += dTime * 5 * m_UniformBufferData.forward;
 	}
+	if (GetWindow()->IsKeyButtonDown('S'))
+	{
+		m_UniformBufferData.pos -= dTime * 5 * m_UniformBufferData.forward;
+	}
+	if(GetWindow()->IsKeyButtonDown('A'))
+	{
+		m_UniformBufferData.pos -= dTime * 5 * m_UniformBufferData.right;
+	}
+	if (GetWindow()->IsKeyButtonDown('D'))
+	{
+		m_UniformBufferData.pos += dTime * 5 * m_UniformBufferData.right;
+	}
+	if(GetWindow()->IsKeyButtonDown(VK_SPACE))
+	{
+		m_UniformBufferData.pos.y += dTime * 5;
+	}
+	if(GetWindow()->IsKeyButtonDown(VK_SHIFT))
+	{
+		m_UniformBufferData.pos.y -= dTime * 5;
+	}
+	
+
+
+	glm::vec2 mouseMovement{ GetWindow()->GetMousePos() - m_PrevMousePosition };
+	m_PrevMousePosition = GetWindow()->GetMousePos();
+
+	if(GetWindow()->IsKeyButtonDown(VK_LBUTTON))
+	{
+		m_CameraRotation.x -= mouseMovement.x*dTime;
+		m_CameraRotation.y -= mouseMovement.y*dTime;
+
+		if (m_CameraRotation.y > 0.5f)
+			m_CameraRotation.y = 0.5f;
+		if (m_CameraRotation.y < -0.5f)
+			m_CameraRotation.y = -0.5f;
+
+		glm::mat4  rotationMatrix(1);
+		m_UniformBufferData.right = glm::normalize(m_UniformBufferData.right);
+		rotationMatrix = glm::rotate(rotationMatrix, m_CameraRotation.y, glm::vec3(m_UniformBufferData.right));
+		rotationMatrix *= glm::rotate(rotationMatrix, m_CameraRotation.x, glm::vec3(0.0f, 1.f, 0.f));
+		m_UniformBufferData.forward = rotationMatrix * glm::vec4{0, 0, -1, 0};
+		m_UniformBufferData.forward = glm::normalize(m_UniformBufferData.forward);
+	}
+
+	UpdateUniformBuffers();
 	return VulkanBaseApp::Update(dTime);
 }
 
@@ -101,21 +146,28 @@ void VulkanApp::CreateStorageBuffers()
 	uint32_t currentId{0};
 
 	// Spheres
-	std::vector<Sphere> spheres;
-	spheres.push_back(Sphere{ glm::vec3(0.f, 0.0f, -2.0f), 0.5f, glm::vec3(0.0f, 1.0f, 0.0f), ++currentId });
-	spheres.push_back(Sphere{ glm::vec3(0.0f, 1.0f, -2.f), 0.5f, glm::vec3(0.65f, 0.77f, 0.97f),  ++currentId });
-	spheres.push_back(Sphere{ glm::vec3(-1.75f, 0.75f, -2.f), 0.5f, glm::vec3(0.9f, 0.76f, 0.46f), ++currentId });
-	VkDeviceSize storageBufferSize = spheres.size() * sizeof(Sphere);
+	float rows{ 10 };
+	float cols{ 10 };
+	for (int r = 0; r < rows; r++)
+	{
+		for (int c = 0; c < cols; c++)
+		{
+			m_Spheres.push_back(Sphere{ glm::vec3(-1.75f + (2.5f/cols)*c, 0.0f, 0.0f - ((2.5f/rows)*r)), (1.f/((rows > cols)? rows : cols)), glm::vec3(0.0f, 1.0f, 0.0f), ++currentId });
+		}
+	}
+	
+
+	VkDeviceSize storageBufferSize = m_Spheres.size() * sizeof(Sphere);
 
 	m_pSphereGeomBuffer = new vkw::Buffer(
 		GetDevice(), GetCommandPool(),
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		size_t(spheres.size()*sizeof(Sphere)), (void*)spheres.data()
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		size_t(m_Spheres.size()*sizeof(Sphere)), (void*)m_Spheres.data()
 	);
 
 	// Planes
 	std::vector<Plane> planes;
-	const float roomDim = 20000.f;
+	const float roomDim = (1.f / ((rows > cols) ? rows : cols));
 	planes.push_back(Plane{ glm::vec3(0.0f, 1.0f, 0.0f), roomDim, glm::vec3(1.0f, 0.f, 0.f), ++currentId });
 	storageBufferSize = planes.size() * sizeof(Plane);
 
@@ -149,20 +201,17 @@ void VulkanApp::UpdateUniformBuffers()
 	++m_UniformBufferData.currentLayer;
 	m_UniformBufferData.currentLayer %= m_SampleCount;
 
-	m_UniformBufferData.lightPos.x = 0.0f + 20*cos(glm::radians(m_AccuTime * 20.0f));
-	m_UniformBufferData.lightPos.y = 3.f;
-	m_UniformBufferData.lightPos.z = 0.0f + 20 * sin(glm::radians(m_AccuTime * 20.0f));
-	//m_UniformBufferData.lightPos = { 0.0f, 10.0f, 15.0f };
-	
+	m_UniformBufferData.lightDir = glm::vec3(-0.5f, -1.f, 0.5f);
+	m_UniformBufferData.lightDir = glm::normalize(m_UniformBufferData.lightDir);
+
+	m_UniformBufferData.right = glm::vec4(glm::cross(glm::vec3(m_UniformBufferData.forward), glm::vec3(0.f, 1.f, 0.f)), 0.f);
+	m_UniformBufferData.up = glm::vec4(glm::cross(glm::vec3(m_UniformBufferData.right), glm::vec3(m_UniformBufferData.forward)), 0.f);
+
 	m_UniformBufferData.rayOffset.x = (2*rand() % 1000) / 1000.f - 1.f;
 	m_UniformBufferData.rayOffset.y = (2*rand() % 1000) / 1000.f - 1.f;
-	//m_UniformBufferData.rayOffset.x = 0.5f;
-	// m_UniformBufferData.rayOffset.y = 0.5f;
+	
 
-	m_UniformBufferData.lookat = { 0.5f, 0.5f, 0.f };
-	m_UniformBufferData.pos = { 0.f, 0.0f, m_Depth };
 	m_UniformBufferData.aspectRatio =  float(GetWindow()->GetSurfaceSize().width) / float(GetWindow()->GetSurfaceSize().height);
-	//m_UniformBufferData.fogColor = { 0.9f , 0.9f, 0.9f, 0.2f};
 	m_pUniformBuffer->Update(&m_UniformBufferData , sizeof(UBOCompute), GetCommandPool());
 }
 
@@ -552,6 +601,17 @@ void VulkanApp::BuildComputeCommandBuffers()
 	vkCmdDispatch(m_ComputeCommandBuffer, m_pSampleTextures->GetWidth() / 16, m_pSampleTextures->GetHeight() / 16, 1);
 
 	vkEndCommandBuffer(m_ComputeCommandBuffer);
+}
+
+void VulkanApp::UpdateSpheres()
+{
+	for (size_t i = 0; i < m_Spheres.size(); i++)
+	{
+		m_Spheres[i].pos.y = sin((m_AccuTime/5.f)+i);
+	}
+
+	m_Spheres.size() * sizeof(Sphere), (void*)m_Spheres.data();
+	m_pSphereGeomBuffer->Update((void*)m_Spheres.data(), m_Spheres.size() * sizeof(Sphere), GetCommandPool());
 }
 
 void VulkanApp::CreateCubeMap()

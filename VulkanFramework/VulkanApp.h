@@ -29,7 +29,7 @@ private:
 	void CreateComputePipeline();
 	void BuildDrawCommandBuffers();
 	void BuildComputeCommandBuffers();
-
+	void UpdateSpheres();
 
 	void DestroyStorageBuffers();
 	void DestroyUniformBuffers();
@@ -45,7 +45,7 @@ private:
 
 	vkw::Buffer*								m_pUniformBuffer = nullptr;
 
-	static const uint32_t						m_SampleCount{ 20 };
+	static const uint32_t						m_SampleCount{ 8 };
 	uint32_t									m_MostRecentSample{ 0 };
 	uint32_t									m_CurrentNrOfSamples{ 0 };
 	vkw::Texture*								m_pSampleTextures = nullptr;
@@ -57,6 +57,7 @@ private:
 		glm::vec3 diffuse;
 		uint32_t id;								
 	};
+	std::vector<Sphere>							m_Spheres;
 
 	struct Plane {
 		glm::vec3 normal;
@@ -80,14 +81,15 @@ private:
 	};
 
 	struct UBOCompute {
-		glm::vec3 lightPos;
+		glm::vec3 lightDir;
 		float aspectRatio;
 		glm::vec2 rayOffset{0.f, 0.f};
-		glm::vec2 pad{};
-		glm::vec3 pos = { 0.0f, 0.0f, 4.0f };
 		int currentLayer = 0;
-		glm::vec3 lookat {0.0f, 0.5f, 0.0f};
 		float fov = 10.0f;
+		glm::vec4 pos = { 0.0f, 0.0f, 4.0f, 1.f };
+		glm::vec4 forward{ 0.0f, -1.0f, -1.0f, 0.f };
+		glm::vec4 right{ 1.f, 0.f, 0.f, 0.f };
+		glm::vec4 up{ 0.f, 1.f, 0.f, 0.f };
 
 	} m_UniformBufferData;
 
@@ -124,6 +126,7 @@ private:
 	VkDescriptorSetLayout	m_ComputeDescriptorSetLayout = VK_NULL_HANDLE;
 
 	float					m_AccuTime{};
-	float					m_Depth{ 0.f };
+	glm::vec2				m_PrevMousePosition{};
+	glm::vec2				m_CameraRotation{};
 };
 
